@@ -39,6 +39,9 @@ while getopts ":eh:s:" opt; do
     h)
       HOST=$OPTARG
       ;;
+    i)
+      EXTIP=$OPTARG
+      ;;
     s)
       SECRET=$OPTARG
       ;;
@@ -96,7 +99,9 @@ sed -i "s/proxy_pass .*/proxy_pass $PROTOCOL_HTTP:\/\/$IP:5066;/g" /etc/bigblueb
 sed -i "s/http[s]*:\/\/\([^\"\/]*\)\([\"\/]\)/$PROTOCOL_HTTP:\/\/$HOST\2/g"  /var/www/bigbluebutton/client/conf/config.xml
 sed -i "s/rtmp[s]*:\/\/\([^\"\/]*\)\([\"\/]\)/$PROTOCOL_RTMP:\/\/$HOST\2/g" /var/www/bigbluebutton/client/conf/config.xml
 
-sed -i "s/server_name  .*/server_name  $HOST;/g" /etc/nginx/sites-available/bigbluebutton
+sed -i "s/server_name  .*/server_name  $HOST $EXTIP;/g" /etc/nginx/sites-available/bigbluebutton
+
+echo "$EXTIP $HOST" >> /etc/hosts
 
 sed -i "s/bigbluebutton.web.serverURL=http[s]*:\/\/.*/bigbluebutton.web.serverURL=$PROTOCOL_HTTP:\/\/$HOST/g" \
   /var/lib/tomcat7/webapps/bigbluebutton/WEB-INF/classes/bigbluebutton.properties
