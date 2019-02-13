@@ -61,6 +61,10 @@ ADD supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 ADD mod/event_socket.conf.xml /opt/freeswitch/etc/freeswitch/autoload_configs
 ADD mod/external.xml          /opt/freeswitch/conf/sip_profiles/external.xml
 
+# -- Install LetsEncrypt
+RUN apt-get install -y letsencrypt
+ADD mod/acme /etc/nginx/
+
 # RUN apt-get install -y bbb-etherpad
 
 # -- Finish startup
