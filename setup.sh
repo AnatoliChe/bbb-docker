@@ -29,6 +29,7 @@ change_yml_value () {
 
 
 # docker run -p 80:80/tcp -p 443:443/tcp -p 1935:1935 -p 5066:5066 -p 3478:3478 -p 3478:3478/udp b2 -h 192.168.0.130
+EXTIP='127.0.0.1'
 
 while getopts ":eh:i:s:" opt; do
   case $opt in
@@ -80,6 +81,7 @@ sudo /etc/init.d/tomcat7 stop
 # Setup the BigBlueButton configuration files
 #
 PROTOCOL_HTTP=http
+PROTOCOL_HTTPS=https
 PROTOCOL_RTMP=rtmp
 
 IP=$(echo "$(LANG=c ifconfig  | awk -v RS="" '{gsub (/\n[ ]*inet /," ")}1' | grep ^et.* | grep addr: | head -n1 | sed 's/.*addr://g' | sed 's/ .*//g')$(LANG=c ifconfig  | awk -v RS="" '{gsub (/\n[ ]*inet /," ")}1' | grep ^en.* | grep addr: | head -n1 | sed 's/.*addr://g' | sed 's/ .*//g')" | head -n1)
@@ -95,22 +97,25 @@ if [ -f /opt/freeswitch/conf/sip_profiles/internal-ipv6.xml ]; then
   mv /opt/freeswitch/conf/sip_profiles/internal-ipv6.xml /opt/freeswitch/conf/sip_profiles/internal-ipv6.xml_
 fi
 
-sed -i "s/proxy_pass .*/proxy_pass $PROTOCOL_HTTP:\/\/$IP:5066;/g" /etc/bigbluebutton/nginx/sip.nginx
+sed -i "s/proxy_pass .*/proxy_pass $PROTOCOL_HTTPS:\/\/$IP:7443;/g" /etc/bigbluebutton/nginx/sip.nginx
 
-sed -i "s/http[s]*:\/\/\([^\"\/]*\)\([\"\/]\)/$PROTOCOL_HTTP:\/\/$HOST\2/g"  /var/www/bigbluebutton/client/conf/config.xml
+sed -i "s/http[s]*:\/\/\([^\"\/]*\)\([\"\/]\)/$PROTOCOL_HTTPS:\/\/$HOST\2/g"  /var/www/bigbluebutton/client/conf/config.xml
 sed -i "s/rtmp[s]*:\/\/\([^\"\/]*\)\([\"\/]\)/$PROTOCOL_RTMP:\/\/$HOST\2/g" /var/www/bigbluebutton/client/conf/config.xml
 
 sed -i "s/server_name  .*/server_name  $HOST $EXTIP;/g" /etc/nginx/sites-available/bigbluebutton
-
+sed -i 's/\(^[^#].*server_name.*;\)/\1\n\tinclude acme;/' /etc/nginx/sites-available/default
+sed -i 's/\(^[^#].*server_name.*;\)/\1\n\tinclude acme;\ninclude ssl-part;/' /etc/nginx/sites-available/bigbluebutton 
+sed -i "s/_HOSTNAME_/$HOST/g" /etc/nginx/ssl-part
+sed -i 's/\(listen \[::\]:80;\)/\1\nlisten   443 ssl http2;/' /etc/nginx/sites-available/bigbluebutton
 echo "$EXTIP $HOST" >> /etc/hosts
 
-sed -i "s/bigbluebutton.web.serverURL=http[s]*:\/\/.*/bigbluebutton.web.serverURL=$PROTOCOL_HTTP:\/\/$HOST/g" \
+sed -i "s/bigbluebutton.web.serverURL=http[s]*:\/\/.*/bigbluebutton.web.serverURL=$PROTOCOL_HTTPS:\/\/$HOST/g" \
   /var/lib/tomcat7/webapps/bigbluebutton/WEB-INF/classes/bigbluebutton.properties
 
 # Update Java screen share configuration
 change_var_value /usr/share/red5/webapps/screenshare/WEB-INF/screenshare.properties streamBaseUrl rtmp://$HOST/screenshare
-change_var_value /usr/share/red5/webapps/screenshare/WEB-INF/screenshare.properties jnlpUrl $PROTOCOL_HTTP://$HOST/screenshare
-change_var_value /usr/share/red5/webapps/screenshare/WEB-INF/screenshare.properties jnlpFile $PROTOCOL_HTTP://$HOST/screenshare/screenshare.jnlp
+change_var_value /usr/share/red5/webapps/screenshare/WEB-INF/screenshare.properties jnlpUrl $PROTOCOL_HTTPS://$HOST/screenshare
+change_var_value /usr/share/red5/webapps/screenshare/WEB-INF/screenshare.properties jnlpFile $PROTOCOL_HTTPS://$HOST/screenshare/screenshare.jnlp
 
 change_var_value /usr/share/red5/webapps/sip/WEB-INF/bigbluebutton-sip.properties bbb.sip.app.ip $IP
 change_var_value /usr/share/red5/webapps/sip/WEB-INF/bigbluebutton-sip.properties freeswitch.ip $IP
@@ -120,13 +125,13 @@ change_yml_value /usr/local/bigbluebutton/bbb-webrtc-sfu/config/default.yml kure
 change_yml_value /usr/local/bigbluebutton/bbb-webrtc-sfu/config/default.yml localIpAddress "$IP"
 change_yml_value /usr/local/bigbluebutton/bbb-webrtc-sfu/config/default.yml ip "$IP"
 
-sed -i  "s/bbbWebAPI[ ]*=[ ]*\"[^\"]*\"/bbbWebAPI=\"${PROTOCOL_HTTP}:\/\/$HOST\/bigbluebutton\/api\"/g" \
+sed -i  "s/bbbWebAPI[ ]*=[ ]*\"[^\"]*\"/bbbWebAPI=\"${PROTOCOL_HTTPS}:\/\/$HOST\/bigbluebutton\/api\"/g" \
   /usr/share/bbb-apps-akka/conf/application.conf
 sed -i "s/bbbWebHost[ ]*=[ ]*\"[^\"]*\"/bbbWebHost=\"$HOST\"/g" \
   /usr/share/bbb-apps-akka/conf/application.conf
 sed -i "s/deskshareip[ ]*=[ ]*\"[^\"]*\"/deskshareip=\"$HOST\"/g" \
   /usr/share/bbb-apps-akka/conf/application.conf
-sed -i  "s/defaultPresentationURL[ ]*=[ ]*\"[^\"]*\"/defaultPresentationURL=\"${PROTOCOL_HTTP}:\/\/$HOST\/default.pdf\"/g" \
+sed -i  "s/defaultPresentationURL[ ]*=[ ]*\"[^\"]*\"/defaultPresentationURL=\"${PROTOCOL_HTTPS}:\/\/$HOST\/default.pdf\"/g" \
   /usr/share/bbb-apps-akka/conf/application.conf
 
 cat > /etc/kurento/modules/kurento/WebRtcEndpoint.conf.ini  << HERE
@@ -222,10 +227,11 @@ fi
 sed -i "s/sharedSecret[ ]*=[ ]*\"[^\"]*\"/sharedSecret=\"$SECRET\"/g" \
   /usr/share/bbb-apps-akka/conf/application.conf
 
-sed -i "s/BigBlueButtonURL = \"http[s]*:\/\/\([^\"\/]*\)\([\"\/]\)/BigBlueButtonURL = \"$PROTOCOL_HTTP:\/\/$HOST\2/g" \
+sed -i "s/BigBlueButtonURL = \"http[s]*:\/\/\([^\"\/]*\)\([\"\/]\)/BigBlueButtonURL = \"$PROTOCOL_HTTPS:\/\/$HOST\2/g" \
   /var/lib/tomcat7/webapps/demo/bbb_api_conf.jsp
 
 sed -i "s/playback_host: .*/playback_host: $HOST/g" /usr/local/bigbluebutton/core/scripts/bigbluebutton.yml
+sed -i "s/playback_protocol: .*/playback_protocol: $PROTOCOL_HTTPS/g" /usr/local/bigbluebutton/core/scripts/bigbluebutton.yml
 
 sed -i 's/daemonize no/daemonize yes/g' /etc/redis/redis.conf
 

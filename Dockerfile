@@ -52,6 +52,14 @@ RUN apt-get install -y bbb-html5
 RUN apt-get update 
 RUN apt-get install -y coturn xmlstarlet vim mlocate
 
+# -- Install LetsEncrypt
+RUN apt-get install -y letsencrypt
+RUN add-apt-repository -y ppa:certbot/certbot
+RUN apt-get update
+RUN apt-get install -y certbot
+ADD mod/acme /etc/nginx/
+ADD mod/ssl-part /etc/nginx/
+
 # -- Install supervisor to run all the BigBlueButton processes (replaces systemd)
 RUN apt-get install -y supervisor
 RUN mkdir -p /var/log/supervisor
@@ -60,10 +68,6 @@ ADD supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # -- Modify FreeSWITCH event_socket.conf.xml to listen to IPV4
 ADD mod/event_socket.conf.xml /opt/freeswitch/etc/freeswitch/autoload_configs
 ADD mod/external.xml          /opt/freeswitch/conf/sip_profiles/external.xml
-
-# -- Install LetsEncrypt
-RUN apt-get install -y letsencrypt
-ADD mod/acme /etc/nginx/
 
 # RUN apt-get install -y bbb-etherpad
 
